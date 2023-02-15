@@ -44,8 +44,13 @@ public:
 
 protected:
   virtual double calcError(double setPoint, double current){
-    // float error = setPoint - current; // direct calculation
-    return setPoint - current;
+    double distance = fmod(setPoint - current , 360.0);
+    if (distance < -180)
+        return distance + 360;
+    else if (distance > 179)
+        return distance - 360;
+    return distance;
+    // return setPoint - current;
   }
 };
 #endif
