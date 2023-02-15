@@ -26,6 +26,7 @@ const double xkP = 1; // displacement kP
 const double xkI = 0.0;
 const double xkD = 0.1; // negative
 PIDAngleController pidAngle(xkP, xkI, xkD); 
+const double MOE = 1; // margin of error is 1 degree
 const double vkP = 0.05; // velocity kP // TODO: ESC already has a velocity speed, so sus.
 const double vkI = 0.000;
 const double vkD = 0.0; 
@@ -133,6 +134,7 @@ void loop() {
     #if motorReversed == 1
       motorSpeed *= -1;
     #endif
+    if (pidAngle.getError() <= MOE) motorSpeed = 0;
     setSpeed(motorSpeed);
 
     delay(BNO055_SAMPLERATE_DELAY_MS);

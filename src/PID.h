@@ -6,14 +6,14 @@ private:
   double kp, ki, kd, lastErr, cumulErr;
 
 protected:
-  virtual double calcError(double setPoint, double current){
+  virtual double calcError(double setPoint, double current) {
     return setPoint - current;
   }
   
 public:
-  PIDController(double kp, double ki, double kd) : kp(kp), ki(ki), kd(kd), lastErr(0), cumulErr(0){}
+  PIDController(double kp, double ki, double kd) : kp(kp), ki(ki), kd(kd), lastErr(0), cumulErr(0) {}
   
-  double compute(double setPoint, double current, long detaT){
+  double compute(double setPoint, double current, long detaT) {
      /*Compute all the working error variables*/
      double error = calcError(setPoint, current);
      double dErr = (detaT==0) ? 0 : calcError(error, lastErr) / detaT;
@@ -26,8 +26,13 @@ public:
      return kp * error + ki * cumulErr - kd * dErr;
   }
   
-  void reset(){
-    lastErr=0;cumulErr=0;
+  void reset() {
+    lastErr=0;
+    cumulErr=0;
+  }
+
+  double getError(){
+    return lastErr;
   }
 };
 
