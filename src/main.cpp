@@ -5,7 +5,7 @@
 #define STATIONARY_PWM 1500
 Servo ESC;
 double motorSpeed = 0;
-const byte reversed = 1;
+// const byte reversed = 1;
 // ------------------
 
 // ------BNO055-----
@@ -22,9 +22,9 @@ double yawAngularSpeed = 0;
 
 // -------PID--------
 #include "PID.h"
-const double xkP = 0.5; // displacement kP 
+const double xkP = 1; // displacement kP 
 const double xkI = 0.0;
-const double xkD = 0.0;
+const double xkD = 0.1; // negative
 PIDAngleController pidAngle(xkP, xkI, xkD); 
 const double vkP = 0.05; // velocity kP // TODO: ESC already has a velocity speed, so sus.
 const double vkI = 0.000;
@@ -53,7 +53,9 @@ void calibrateESC() {
 // Set the current speed and direction of the motor
 void setSpeed(double targetSpeed) {
   // double check how this works for a negative value. MIN_PWM should go max backwards
-  motorSpeed = constrain(STATIONARY_PWM + targetSpeed, MIN_PWM, MAX_PWM); 
+  targetSpeed *= -1;
+  float motorSpeed = constrain(STATIONARY_PWM + targetSpeed, MIN_PWM, MAX_PWM); 
+  // Serial.print("pwm: "); Serial.print(motorSpeed);
   ESC.writeMicroseconds(motorSpeed);
 }
 
@@ -127,23 +129,27 @@ void loop() {
     // } else { // state 1 = set setpoint to calculated motor output. Error = desired pwm -avg pwm 
     //   motorSpeed += pidSpeed.compute(pidAngle.compute(targetPos, yawAngle, timeCur - timePrev), rollingAvg, timeCur - timePrev);
     // } 
-    motorSpeed = pidAngle.compute(0, yawAngle, timeCur - timePrev); // need because time is updated each iter
+    motorSpeed = pidAngle.compute(targetPos, yawAngle, timeCur - timePrev); // need because time is updated each iter
     #if motorReversed == 1
       motorSpeed *= -1;
     #endif
-    setSpeed(-motorSpeed);
+    setSpeed(motorSpeed);
 
     delay(BNO055_SAMPLERATE_DELAY_MS);
 
     // Print info to console
-    Serial.print("motorSpeed: "); Serial.print(motorSpeed);
-    sensors_event_t event;
-    bno.getEvent(&event);
-    Serial.print(" roll: "); Serial.print(event.orientation.roll);
-    Serial.print(" heading: "); Serial.print(event.orientation.heading);
-    Serial.print(" gyro x: "); Serial.print(event.gyro.x);
-    Serial.print(" gyro y: "); Serial.print(event.gyro.y);
-    Serial.print(" gyro z: "); Serial.println(event.gyro.z);
+    // Serial.print("motorSpeed: "); Serial.print(motorSpeed);
+    // goes from -5 to 355. BAD
+    // Serial.print(" time step: "); Serial.println(timeCur - timePrev);
+    // time step is ~35 with just these 2, ~115 with all prints
+
+    // sensors_event_t event;
+    // bno.getEvent(&event);
+    // Serial.print(" roll: "); Serial.print(event.orientation.roll);
+    // Serial.print(" heading: "); Serial.print(event.orientation.heading);
+    // Serial.print(" gyro x: "); Serial.print(event.gyro.x);
+    // Serial.print(" gyro y: "); Serial.print(event.gyro.y);
+    // Serial.print(" gyro z: "); Serial.println(event.gyro.z);
     // Serial.print(F(" "));
     // Serial.println(rollingAvg);
   }

@@ -23,7 +23,7 @@ public:
      cumulErr += error * detaT;
 
      /*Compute PID Output*/
-     return kp * error + ki * cumulErr + kd * dErr;
+     return kp * error + ki * cumulErr - kd * dErr;
   }
   
   void reset(){
@@ -39,12 +39,7 @@ public:
 
 protected:
   virtual double calcError(double setPoint, double current){
-    // double distance = fmod(setPoint - current , 360.0); // device automatically wraps
-    // if (distance < 0)
-    //     return distance + 360;
-    // else if (distance > 359)
-    //     return distance - 360;
-    // return distance;
+    // float error = setPoint - current; // direct calculation
     return setPoint - current;
   }
 };
