@@ -1,3 +1,13 @@
+// ------GENERAL-----
+#define TEST 0
+long timeCur, timePrev, timeStart; 
+const int numReadings = 5;
+double readings[numReadings];
+int readIndex = 0;
+double total = 0;
+double rollingAvg = 0;
+double targetPos = 0;
+
 // ------BLDC--------
 #include <Servo.h>
 #define PWM_BOUNDS 200 // range is PWM_STATIONARY +/- PWM_BOUNDS
@@ -21,25 +31,18 @@ double yawAngularSpeed = 0;
 
 // -------PID--------
 #include "PID.h"
-const double xkP = 2.5; // displacement kP 
+const double xkP = 1; // displacement kP 
 const double xkI = 0.0;
 const double xkD = 400; 
 PIDAngleController pidAngle(xkP, xkI, xkD); 
 const float MOE = 0.05; // margin of error is 0.05 degrees - I cry
-const double vkP = 0.05; // velocity kP // TODO: ESC already has a velocity speed, so sus.
+// TODO: ESC already has a velocity speed, so sus. Consider 
+const double vkP = 0.05; // velocity kP 
 const double vkI = 0.000;
 const double vkD = 0.017; 
 PIDController pidSpeed(vkP, vkI, vkD);
 // ------------------
 
-// ------GENERAL-----
-long timeCur, timePrev, timeStart; 
-const int numReadings = 5;
-double readings[numReadings];
-int readIndex = 0;
-double total = 0;
-double rollingAvg = 0;
-double targetPos = 0;
 // FSM variables
 byte controllerState = 0;
 // ------------------
@@ -57,9 +60,8 @@ void updateYawAngle() {
 }
 
 void updateYawSpeed() {
-  sensors_event_t event;
-  bno.getEvent(&event);
-  yawAngularSpeed = event.gyro.x;
+  imu::Vector<3> gyro = bno.getVector(Adafruit_BNO055::VECTOR_GYROSCOPE);
+  yawAngularSpeed = gyro.x(); // degrees/sec
 }
 
 // Smooth the angular speed --> rolling average
@@ -79,8 +81,29 @@ void setSpeed(double targetSpeed) {
   #endif
 
   float motorSpeed = PWM_STATIONARY + targetSpeed;
-  Serial.print(" pwm: "); Serial.println(motorSpeed);
+  #if TEST
+    Serial.print(" pwm: "); Serial.println(motorSpeed);
+  #endif
   ESC.writeMicroseconds(motorSpeed);
+}
+
+// Set the current speed from -1 to 1 as a percentage of speed
+void setPercentSpeed (double percent) {
+  percent = constrain(percent, -1.0, 1.0);
+  setSpeed(percent * PWM_BOUNDS);
+}
+
+void printMoreThings() {
+    // Print info to console
+    // Serial.print("motorSpeed: "); Serial.print(motorSpeed);
+    // Serial.print(" time step: "); Serial.println(timeCur - timePrev);
+
+    sensors_event_t event;
+    bno.getEvent(&event);
+    // Serial.print(" roll: "); Serial.print(event.orientation.roll);
+    imu::Vector<3> gyro = bno.getVector(Adafruit_BNO055::VECTOR_GYROSCOPE);
+    Serial.print("\tgyro z:\t"); Serial.print(gyro.z());
+    Serial.println(F(" "));
 }
 
 void setup() {
@@ -117,48 +140,40 @@ void loop() {
     updateYawSpeed();
     updateRollingAvg();
 
-    // FSM transition
-    if (controllerState == 1 && fabs(rollingAvg) > 360 /* °/s */) {
-      controllerState = 0;
-    } else if (controllerState == 0 && fabs(rollingAvg) < 45 /* °/s */) {
-      controllerState = 1;
-    }
-    float update = 0;
-    // FSM action 
-    if (controllerState == 0) { // state 0 = detumble + update time for angle 
-      update = pidSpeed.compute(0, rollingAvg, timeCur - timePrev);
-      pidAngle.compute(targetPos, yawAngle, timeCur - timePrev); // need because time is updated each iter
-    } else { // state 1 = set setpoint to calculated motor output. Error = desired pwm -avg pwm 
-      float anglePwmOut = pidAngle.compute(targetPos, yawAngle, timeCur - timePrev);
-      Serial.print("anglePwmOut: "); Serial.print(anglePwmOut);
-      update = pidSpeed.compute(anglePwmOut, rollingAvg, timeCur - timePrev);
-    } 
-    motorSpeed += update;
-    motorSpeed = constrain(motorSpeed, -PWM_BOUNDS, PWM_BOUNDS);
-    if (fabs(pidAngle.getError()) <= MOE) motorSpeed = 0;
-    Serial.print(" update: "); Serial.print(update);
-    Serial.print(" motorSpeed: "); Serial.print(motorSpeed);
+    setPercentSpeed(.2);
 
-    // motorSpeed = pidAngle.compute(targetPos, yawAngle, timeCur - timePrev); // need because time is updated each iter
+    // // FSM transition
+    // if (controllerState == 1 && fabs(rollingAvg) > 360 /* °/s */) {
+    //   controllerState = 0;
+    // } else if (controllerState == 0 && fabs(rollingAvg) < 45 /* °/s */) {
+    //   controllerState = 1;
+    // }
+    // float update = 0;
+    // // FSM action 
+    // if (controllerState == 0) { // state 0 = detumble + update time for angle 
+    //   update = pidSpeed.compute(0, rollingAvg, timeCur - timePrev);
+    //   pidAngle.compute(targetPos, yawAngle, timeCur - timePrev); // need because time is updated each iter
+    // } else { // state 1 = set setpoint to calculated motor output. Error = desired pwm -avg pwm 
+    //   float anglePwmOut = pidAngle.compute(targetPos, yawAngle, timeCur - timePrev);
+    //   #if TEST
+    //     Serial.print("anglePwmOut: "); Serial.print(anglePwmOut);
+    //     Serial.print(" rollingAvg: "); Serial.print(rollingAvg);
+    //   #endif
+    //   update = pidSpeed.compute(anglePwmOut, rollingAvg, timeCur - timePrev);
+    // } 
+    // motorSpeed += update;
+    // motorSpeed = constrain(motorSpeed, -PWM_BOUNDS, PWM_BOUNDS);
+    // if (fabs(pidAngle.getError()) <= MOE) motorSpeed = 0;
+    // #if TEST
+    //   Serial.print(" update: "); Serial.print(update);
+    //   Serial.print(" motorSpeed: "); Serial.print(motorSpeed);
+    // #endif
+    // printMoreThings();
 
-    setSpeed(motorSpeed);
+    // // motorSpeed = pidAngle.compute(targetPos, yawAngle, timeCur - timePrev); // need because time is updated each iter
+
+    // setSpeed(motorSpeed);
 
     delay(BNO055_SAMPLERATE_DELAY_MS);
-
-    // Print info to console
-    // Serial.print("motorSpeed: "); Serial.print(motorSpeed);
-    // goes from -5 to 355. BAD
-    // Serial.print(" time step: "); Serial.println(timeCur - timePrev);
-    // time step is ~35 with just these 2, ~115 with all prints
-
-    // sensors_event_t event;
-    // bno.getEvent(&event);
-    // Serial.print(" roll: "); Serial.print(event.orientation.roll);
-    // Serial.print(" heading: "); Serial.print(event.orientation.heading);
-    // Serial.print(" gyro x: "); Serial.print(event.gyro.x);
-    // Serial.print(" gyro y: "); Serial.print(event.gyro.y);
-    // Serial.print(" gyro z: "); Serial.println(event.gyro.z);
-    // Serial.print(F(" "));
-    // Serial.println(rollingAvg);
   }
 }
