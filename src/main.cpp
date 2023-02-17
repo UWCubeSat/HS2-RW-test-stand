@@ -10,7 +10,7 @@ double targetPos = 0;
 
 // ------BLDC--------
 #include <Servo.h>
-#define PWM_BOUNDS 100 // range is PWM_STATIONARY +/- PWM_BOUNDS
+#define PWM_BOUNDS 200 // range is PWM_STATIONARY +/- PWM_BOUNDS
 #define PWM_DEADZONE 0.132 // needs to be at least this percent of PWM_BOUNDS=200 to do have motor spin
 #define PWM_STATIONARY 1500
 #define REVERSED 1
@@ -32,14 +32,14 @@ double yawAngularSpeed = 0;
 
 // -------PID--------
 #include "PID.h"
-const double xkP = 1; // displacement kP 
+const double xkP = 2.5; // displacement kP 
 const double xkI = 0.0;
-const double xkD = 400; 
+const double xkD = 1600; 
 PIDAngleController pidAngle(xkP, xkI, xkD); 
-const float MOE = 0.05; // margin of error is 0.05 degrees - I cry
-const double vkP = 0.05; // velocity kP 
-const double vkI = 0.000;
-const double vkD = 0.05; 
+const float MOE = 1; // degrees
+const double vkP = 0.0013; // velocity kP 
+const double vkI = 0.0;
+const double vkD = 0.0013; 
 PIDController pidSpeed(vkP, vkI, vkD);
 // ------------------
 
@@ -126,7 +126,13 @@ void setup() {
   timeStart = timeCur;
 }
 
+int countLoops = 0;
+
 void loop() {
+  if (countLoops < 10) {
+    motorSpeed = max(30, motorSpeed);
+    countLoops++;
+  } 
   // Every 10ms, read IMU and call controllers
   if (millis() - timeCur > 10) {
     timePrev = timeCur;
@@ -143,8 +149,10 @@ void loop() {
     } else if (controllerState == 0 && fabs(rollingAvg) < 45 /* °/s */) {
       controllerState = 1;
     }
-    float update = 0;
+    controllerState = 1;
+    
     // FSM action 
+    float update = 0;
     if (controllerState == 0) { // state 0 = detumble + update time for angle 
       update = pidSpeed.compute(0, rollingAvg, timeCur - timePrev); 
       pidAngle.compute(targetPos, yawAngle, timeCur - timePrev); // need because time is updated each iter
@@ -154,8 +162,8 @@ void loop() {
         Serial.print("anglePwmOut: "); Serial.print(anglePwmOut);
       #endif
       update = pidSpeed.compute(anglePwmOut, rollingAvg, timeCur - timePrev);
-      if (fabs(pidAngle.getError()) <= MOE) update = 0; // if withing MOE, keep constant velocity
     } 
+    if (fabs(pidAngle.getError()) <= MOE*5) update = 0; // if withing MOE, keep constant velocity
     motorSpeed += update;
     motorSpeed = constrain(motorSpeed, -PWM_BOUNDS, PWM_BOUNDS);
     // TODO: consider doing only position controller but with the update instead of direct to output
@@ -164,13 +172,14 @@ void loop() {
     #if TEST
       // Serial.print(" time step: "); Serial.println(timeCur - timePrev);
       // Serial.print(" rollingAvg: "); Serial.print(rollingAvg);
+      Serial.print(" posError: "); Serial.print(pidAngle.getError());
+      Serial.print(" speedError: "); Serial.print(pidSpeed.getError());
       Serial.print(" update: "); Serial.print(update);
       Serial.print(" motorSpeed: "); Serial.print(motorSpeed);
     #endif
 
     // motorSpeed = pidAngle.compute(targetPos, yawAngle, timeCur - timePrev); // need because time is updated each iter
-    if (controllerState == 0) setSpeed(0);
-    else setSpeed(motorSpeed);
+    setSpeed(motorSpeed);
 
     // printMoreThings();
     #if TEST

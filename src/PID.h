@@ -13,14 +13,14 @@ protected:
 public:
   PIDController(double kp, double ki, double kd) : kp(kp), ki(ki), kd(kd), lastErr(0), cumulErr(0) {}
   
-  double compute(double setPoint, double current, long detaT) {
+  double compute(double setPoint, double current, long deltaT) {
      /*Compute all the working error variables*/
      double error = calcError(setPoint, current);
-     double dErr = (detaT==0) ? 0 : calcError(error, lastErr) / detaT;
+     double dErr = (deltaT==0) ? 0 : calcError(error, lastErr) / deltaT;
      
      /*Remember some variables for next time*/
      lastErr = error;
-     cumulErr += error * detaT;
+     cumulErr += error * deltaT;
 
      /*Compute PID Output*/
      return kp * error + ki * cumulErr - kd * dErr;
