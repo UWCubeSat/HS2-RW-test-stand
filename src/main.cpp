@@ -32,15 +32,20 @@ double yawAngularSpeed = 0;
 
 // -------PID--------
 #include "PID.h"
-const double xkP = 2.5; // displacement kP 
+const double xkP = 0.05;  
 const double xkI = 0.0;
-const double xkD = 1600; 
+const double xkD = 400; 
 PIDAngleController pidAngle(xkP, xkI, xkD); 
 const float MOE = 1; // degrees
-const double vkP = 0.0013; // velocity kP 
+// const double vkP = 0.00006; // works best for detumble
+const double vkP = 0.0013; // works best for movement. Cursed. Also switching between constants can be done with public functions
+const double vkD = 0.0013;
+// const double vkP = 0.007; 
+// const double vkD = 0.00; 
 const double vkI = 0.0;
-const double vkD = 0.0013; 
 PIDController pidSpeed(vkP, vkI, vkD);
+// TODO: consider ROV simulation for PID. Cross product the displacement vector for each target with basis vector
+//        note: Is the basis the change of basis from standard to current?
 // ------------------
 
 // FSM variables
@@ -129,10 +134,10 @@ void setup() {
 int countLoops = 0;
 
 void loop() {
-  if (countLoops < 10) {
-    motorSpeed = max(30, motorSpeed);
-    countLoops++;
-  } 
+  // if (countLoops < 30) {
+  //   motorSpeed = max(30, motorSpeed);
+  //   countLoops++;
+  // } 
   // Every 10ms, read IMU and call controllers
   if (millis() - timeCur > 10) {
     timePrev = timeCur;
@@ -154,21 +159,24 @@ void loop() {
     // FSM action 
     float update = 0;
     if (controllerState == 0) { // state 0 = detumble + update time for angle 
+      // update = pidSpeed.compute(0, rollingAvg, timeCur - timePrev); 
       update = pidSpeed.compute(0, rollingAvg, timeCur - timePrev); 
       pidAngle.compute(targetPos, yawAngle, timeCur - timePrev); // need because time is updated each iter
     } else { // state 1 = set setpoint to calculated motor output. Error = desired pwm -avg pwm 
       float anglePwmOut = pidAngle.compute(targetPos, yawAngle, timeCur - timePrev);
+      update = pidSpeed.compute(anglePwmOut, rollingAvg, timeCur - timePrev);
       #if TEST
         Serial.print("anglePwmOut: "); Serial.print(anglePwmOut);
       #endif
-      update = pidSpeed.compute(anglePwmOut, rollingAvg, timeCur - timePrev);
     } 
-    if (fabs(pidAngle.getError()) <= MOE*5) update = 0; // if withing MOE, keep constant velocity
+    if (fabs(pidAngle.getError()) <= MOE) update = 0; // if withing MOE, keep constant velocity
+    if (fabs(pidSpeed.getError()) <= MOE) update = 0; // if withing MOE, keep constant velocity
     motorSpeed += update;
+    // There's a deadzone where motor speed doesn't do anything but it still takes time to cross ~= +/- 20
+    if (motorSpeed < 20 && motorSpeed > -19) motorSpeed = -20;
+    else if (motorSpeed > -20 && motorSpeed < 19) motorSpeed = 20;
+
     motorSpeed = constrain(motorSpeed, -PWM_BOUNDS, PWM_BOUNDS);
-    // TODO: consider doing only position controller but with the update instead of direct to output
-    //      odd behavior might be due to ESC apparently having speed PID apparently
-    //      by odd, I mean motion is jank
     #if TEST
       // Serial.print(" time step: "); Serial.println(timeCur - timePrev);
       // Serial.print(" rollingAvg: "); Serial.print(rollingAvg);
