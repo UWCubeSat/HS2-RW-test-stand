@@ -24,7 +24,8 @@ public:
 
     // we don't want derivative to cause the thing to ever go backwards
     double out = kp * error + ki * cumulErr + kd * dErr;
-    // condition is sus
+    // I think condition is correct. 98%.
+    // If you go move the thing way, it goes the other way
     out = (dErr > 0) ? max(0, out) : min(0, out);
     return out;
   }
