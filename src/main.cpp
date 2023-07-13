@@ -18,7 +18,8 @@ Servo ESC;
 double motorSpeed = 0;
 // ------------------
 
-// ------BNO055-----
+// ------BNO055----- (GYRO)
+// DOC STRINGS: https://www.arduino.cc/reference/en/libraries/adafruit-bno055/ https://github.com/adafruit/Adafruit_BNO055 
 #include <Wire.h>
 #include <Adafruit_Sensor.h>
 #include <Adafruit_BNO055.h>
@@ -28,6 +29,18 @@ double motorSpeed = 0;
 Adafruit_BNO055 bno = Adafruit_BNO055(55);
 double yawAngle = 0;
 double yawAngularSpeed = 0;
+
+double gyroHeadingAngle = 0;
+double gyroPitchAngle = 0;
+uint8_t* gyroReserved = 0; 
+double gyroRoll= 0; 
+double gyroStatus = 0; 
+
+float* gyroV = 0; 
+double gyroX = 0; 
+double gyroY = 0; 
+double gyroZ = 0; 
+
 // ------------------
 
 // -------PID--------
@@ -65,6 +78,18 @@ void updateYawAngle() {
   sensors_event_t event;
   bno.getEvent(&event);
   yawAngle = event.orientation.roll;
+
+  gyroPitchAngle = event.gyro.pitch;
+  gyroHeadingAngle = event.gyro.heading;
+
+  gyroReserved = event.gyro.reserved;
+  gyroRoll = event.gyro.roll;
+  gyroStatus = event.gyro.status;
+  gyroV = event.gyro.v;
+  gyroX = event.gyro.x;
+  gyroY = event.gyro.y;
+  gyroZ = event.gyro.z;
+
 }
 
 void updateYawSpeed() {
@@ -208,6 +233,38 @@ void loop() {
     updateYawAngle();
     updateYawSpeed();
     updateRollingAvg();
+
+    // **** TESTING BNO055 ATTRIBUTES ***** //
+
+    Serial.print("Heading Angle: ");
+    Serial.println(gyroHeadingAngle);
+
+    Serial.print("Pitch Angle: ");
+    Serial.println(gyroPitchAngle);
+
+    Serial.print("Gyro Reserved: ");
+    Serial.println(reinterpret_cast<uintptr_t>(gyroReserved));
+
+    Serial.print("Gyro Roll: ");
+    Serial.println(gyroRoll);
+
+    Serial.print("Gyro Status: ");
+    Serial.println(gyroStatus);
+
+    Serial.print("Gyro V: ");
+    Serial.println(reinterpret_cast<uintptr_t>(gyroV));
+
+    Serial.print("Gyro X: ");
+    Serial.println(gyroX);
+
+    Serial.print("Gyro Y: ");
+    Serial.println(gyroY);
+
+    Serial.print("Gyro Z: ");
+    Serial.println(gyroZ);
+
+
+
 
 
 
